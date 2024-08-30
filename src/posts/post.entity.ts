@@ -6,10 +6,10 @@ class Post {
   public id: number;
 
   @Column()
-  public title: string;
+  public title?: string;
 
   @Column()
-  public content: string;
+  public content?: string;
 }
 
 export default Post;
