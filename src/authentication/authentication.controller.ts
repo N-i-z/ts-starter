@@ -1,7 +1,6 @@
 import {
   Body,
   Req,
-  Res,
   Controller,
   HttpCode,
   Post,
@@ -9,15 +8,18 @@ import {
   UseGuards,
   HttpException,
   HttpStatus,
+  SerializeOptions,
 } from '@nestjs/common';
 import { AuthenticationService } from './authentication.service';
 import RegisterDto from './dto/register.dto';
 import RequestWithUser from './requestWithUser.interface';
 import { LocalAuthenticationGuard } from './localAuthentication.guard';
-import JwtAuthenticationGuard from './jwt-authentication.guard'; // Import JwtAuthenticationGuard
-import { Response } from 'express'; // Import Response type
+import JwtAuthenticationGuard from './jwt-authentication.guard';
 
 @Controller('authentication')
+@SerializeOptions({
+  strategy: 'excludeAll',
+})
 export class AuthenticationController {
   constructor(private readonly authenticationService: AuthenticationService) {}
 
@@ -29,8 +31,8 @@ export class AuthenticationController {
   @HttpCode(200)
   @UseGuards(LocalAuthenticationGuard)
   @Post('log-in')
-  async logIn(@Req() request: RequestWithUser, @Res() response: Response) {
-    const user = request.user;
+  async logIn(@Req() request: RequestWithUser) {
+    const { user } = request;
 
     // Check if user.id is defined and of type number
     if (!user.id || typeof user.id !== 'number') {
@@ -40,30 +42,46 @@ export class AuthenticationController {
       );
     }
 
-    // Generate the cookie with JWT token
-    const cookie = this.authenticationService.getCookieWithJwtToken(user.id);
+    // Ensure that request.res is defined
+    if (request.res) {
+      // Generate the cookie with JWT token
+      const cookie = this.authenticationService.getCookieWithJwtToken(user.id);
 
-    // Set the cookie in the response header
-    response.setHeader('Set-Cookie', cookie);
+      // Set the cookie in the response header using request.res
+      request.res.setHeader('Set-Cookie', cookie);
+    } else {
+      throw new HttpException(
+        'Response object is missing',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
 
     // Remove password from user object before sending it
     user.password = undefined;
 
-    // Send the response
-    return response.send(user);
+    // Return the user object directly
+    return user;
   }
 
   @UseGuards(JwtAuthenticationGuard)
   @Post('log-out')
-  async logOut(@Req() request: RequestWithUser, @Res() response: Response) {
-    // Set the cookie to log out
-    response.setHeader(
-      'Set-Cookie',
-      this.authenticationService.getCookieForLogOut(),
-    );
+  async logOut(@Req() request: RequestWithUser) {
+    // Ensure that request.res is defined
+    if (request.res) {
+      // Set the cookie to log out using request.res
+      request.res.setHeader(
+        'Set-Cookie',
+        this.authenticationService.getCookieForLogOut(),
+      );
 
-    // Send a successful response
-    return response.sendStatus(200);
+      // Send a successful response
+      return { message: 'Logged out successfully' };
+    } else {
+      throw new HttpException(
+        'Response object is missing',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @UseGuards(JwtAuthenticationGuard)

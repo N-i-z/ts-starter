@@ -6,7 +6,7 @@ import {
   Param,
   Post,
   Put,
-  Patch, // Add Patch decorator
+  Patch,
   UseGuards,
 } from '@nestjs/common';
 import { PostsService } from './posts.service';
