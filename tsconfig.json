@@ -11,6 +11,13 @@
     "outDir": "./dist",
     "baseUrl": "./",
     "incremental": true,
-    "skipLibCheck": true
-  }
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "alwaysStrict": true,
+    "noImplicitAny": true,
+    "strict": true,
+    "strictPropertyInitialization": false
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules"]
 }
