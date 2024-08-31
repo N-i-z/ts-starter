@@ -1,36 +1,37 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { UsersService } from 'src/users/users.service';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
 import RegisterDto from './dto/register.dto';
-import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { TokenPayload } from './tokenPayload.interface'; // Ensure the correct path
+import { JwtUtils } from '../utils/jwt.utils';
+import { TokenPayload } from './tokenPayload.interface';
 
 @Injectable()
 export class AuthenticationService {
+  private jwtUtils: JwtUtils; // Create an instance of JwtUtils
+
   constructor(
     private readonly usersService: UsersService,
-    private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+    this.jwtUtils = new JwtUtils(configService); // Initialize JwtUtils
+  }
 
   public async getAuthenticatedUser(email: string, plainTextPassword: string) {
     try {
       const user = await this.usersService.getByEmail(email);
 
-      // Ensure that the user's password is defined
-      if (!user.password) {
+      if (!user || !user.password) {
         throw new HttpException(
-          'Password not set for this user',
+          'Invalid email or password',
           HttpStatus.BAD_REQUEST,
         );
       }
 
       await this.verifyPassword(plainTextPassword, user.password);
 
-      // Set password to undefined to avoid exposing it
+      // Avoid exposing the password
       user.password = undefined;
-
       return user;
     } catch (error) {
       throw new HttpException(
@@ -41,25 +42,29 @@ export class AuthenticationService {
   }
 
   public async register(registerDto: RegisterDto) {
-    // Hash the user's password
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
-
-    // Create a new user with hashed password
     const user = await this.usersService.create({
       ...registerDto,
       password: hashedPassword,
     });
 
-    // Return the newly created user without password
-    user.password = undefined;
+    user.password = undefined; // Hide password in response
     return user;
+  }
+
+  public getJwtToken(userId: number): string {
+    const payload: TokenPayload = { userId };
+    return this.jwtUtils.generateToken(payload); // Generate JWT token
+  }
+
+  public verifyJwtToken(token: string): any {
+    return this.jwtUtils.verifyToken(token); // Verify JWT token
   }
 
   private async verifyPassword(
     plainTextPassword: string,
     hashedPassword: string,
   ) {
-    // If hashedPassword is undefined, throw an error
     if (!hashedPassword) {
       throw new HttpException(
         'Password not set for this user',
@@ -80,13 +85,16 @@ export class AuthenticationService {
     }
   }
 
-  public getCookieWithJwtToken(userId: number) {
+  public getCookieWithJwtToken(userId: number): string {
     const payload: TokenPayload = { userId };
-    const token = this.jwtService.sign(payload);
-    return `Authentication=${token}; HttpOnly; Path=/; Max-Age=${this.configService.get<number>('JWT_EXPIRATION_TIME')}`;
+    const token = this.jwtUtils.generateToken(payload); // Generate JWT token
+    const expirationTime = this.configService.get<number>(
+      'JWT_EXPIRATION_TIME',
+    );
+    return `Authentication=${token}; HttpOnly; Path=/; Max-Age=${expirationTime}`;
   }
 
-  public getCookieForLogOut() {
+  public getCookieForLogOut(): string {
     return `Authentication=; HttpOnly; Path=/; Max-Age=0`;
   }
 }

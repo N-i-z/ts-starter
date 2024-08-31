@@ -1,6 +1,7 @@
 import {
   Body,
   Req,
+  Res,
   Controller,
   HttpCode,
   Post,
@@ -15,8 +16,9 @@ import RegisterDto from './dto/register.dto';
 import RequestWithUser from './requestWithUser.interface';
 import { LocalAuthenticationGuard } from './localAuthentication.guard';
 import JwtAuthenticationGuard from './jwt-authentication.guard';
+import { Response } from 'express';
 
-@Controller('authentication')
+@Controller('auth')
 @SerializeOptions({
   strategy: 'excludeAll',
 })
@@ -30,8 +32,8 @@ export class AuthenticationController {
 
   @HttpCode(200)
   @UseGuards(LocalAuthenticationGuard)
-  @Post('log-in')
-  async logIn(@Req() request: RequestWithUser) {
+  @Post('login')
+  async logIn(@Req() request: RequestWithUser, @Res() response: Response) {
     const { user } = request;
 
     // Check if user.id is defined and of type number
@@ -42,46 +44,30 @@ export class AuthenticationController {
       );
     }
 
-    // Ensure that request.res is defined
-    if (request.res) {
-      // Generate the cookie with JWT token
-      const cookie = this.authenticationService.getCookieWithJwtToken(user.id);
+    // Generate the cookie with JWT token
+    const cookie = this.authenticationService.getCookieWithJwtToken(user.id);
 
-      // Set the cookie in the response header using request.res
-      request.res.setHeader('Set-Cookie', cookie);
-    } else {
-      throw new HttpException(
-        'Response object is missing',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    // Set the cookie in the response header
+    response.setHeader('Set-Cookie', cookie);
 
     // Remove password from user object before sending it
     user.password = undefined;
 
-    // Return the user object directly
-    return user;
+    // Send the response
+    return response.json(user);
   }
 
   @UseGuards(JwtAuthenticationGuard)
-  @Post('log-out')
-  async logOut(@Req() request: RequestWithUser) {
-    // Ensure that request.res is defined
-    if (request.res) {
-      // Set the cookie to log out using request.res
-      request.res.setHeader(
-        'Set-Cookie',
-        this.authenticationService.getCookieForLogOut(),
-      );
+  @Post('logout')
+  async logOut(@Res() response: Response) {
+    // Set the cookie to log out
+    response.setHeader(
+      'Set-Cookie',
+      this.authenticationService.getCookieForLogOut(),
+    );
 
-      // Send a successful response
-      return { message: 'Logged out successfully' };
-    } else {
-      throw new HttpException(
-        'Response object is missing',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    // Send a successful response
+    return response.json({ message: 'Logged out successfully' });
   }
 
   @UseGuards(JwtAuthenticationGuard)
