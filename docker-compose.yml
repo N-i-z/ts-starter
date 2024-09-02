@@ -1,25 +1,25 @@
+version: '3.8'
+
 services:
   postgres:
-    container_name: postgres
+    container_name: postgres1
     image: postgres:latest
     ports:
       - '5432:5432'
     volumes:
-      - /data/postgres:/data/postgres
+      - postgres-data:/var/lib/postgresql/data
     env_file:
       - docker.env
     networks:
       - postgres
 
   pgadmin:
-    links:
-      - postgres:postgres
     container_name: pgadmin
     image: dpage/pgadmin4
     ports:
       - '8080:80'
     volumes:
-      - /data/pgadmin:/root/.pgadmin
+      - pgadmin-data:/root/.pgadmin
     env_file:
       - docker.env
     networks:
@@ -29,6 +29,8 @@ services:
     image: 'redis:alpine'
     ports:
       - '6379:6379'
+    networks:
+      - redis
 
   redis-commander:
     image: rediscommander/redis-commander:latest
@@ -37,6 +39,8 @@ services:
     ports:
       - '8081:8081'
     depends_on:
+      - redis
+    networks:
       - redis
 
   es01:
@@ -54,11 +58,12 @@ services:
         soft: -1
         hard: -1
     volumes:
-      - data01:/usr/share/elasticsearch/data
+      - es-data01:/usr/share/elasticsearch/data
     ports:
       - 9200:9200
     networks:
       - elastic
+
   es02:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.9.1
     container_name: es02
@@ -74,9 +79,10 @@ services:
         soft: -1
         hard: -1
     volumes:
-      - data02:/usr/share/elasticsearch/data
+      - es-data02:/usr/share/elasticsearch/data
     networks:
       - elastic
+
   es03:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.9.1
     container_name: es03
@@ -92,20 +98,26 @@ services:
         soft: -1
         hard: -1
     volumes:
-      - data03:/usr/share/elasticsearch/data
+      - es-data03:/usr/share/elasticsearch/data
     networks:
       - elastic
 
 volumes:
-  data01:
+  postgres-data:
     driver: local
-  data02:
+  pgadmin-data:
     driver: local
-  data03:
+  es-data01:
+    driver: local
+  es-data02:
+    driver: local
+  es-data03:
     driver: local
 
 networks:
   postgres:
+    driver: bridge
+  redis:
     driver: bridge
   elastic:
     driver: bridge
